@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rifa Interactiva Mágica</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            text-align: center;
+            /* Fondo oscuro un poco más azul/violeta oscuro para que resalte la magia */
+            background: linear-gradient(180deg, #16162a 0%, #1a1a3a 100%);
+            color: white;
+            margin: 0;
+            padding: 20px;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+        h1 { margin-bottom: 5px; color: #f9a826; text-shadow: 0 0 10px rgba(249, 168, 38, 0.5); }
+        
+        /* --- FONDO KAWAII ANIMADO --- */
+        .fondo-animado {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100vw; height: 100vh;
+            z-index: -1; /* Se queda atrás de todo */
+            pointer-events: none; /* Evita que bloqueen los clics de las cartas */
+            overflow: hidden;
+        }
+        .elemento-flotante {
+            position: absolute;
+            bottom: -100px;
+            opacity: 0.6; /* Un poco transparentes para no distraer demasiado */
+            user-select: none;
+            filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.3));
+            animation: flotar linear infinite;
+        }
+        @keyframes flotar {
+            0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+            10% { opacity: 0.6; }
+            90% { opacity: 0.6; }
+            100% { transform: translateY(-120vh) rotate(360deg); opacity: 0; }
+        }
+
+        /* --- PANELES Y CONTROLES --- */
+        .controles {
+            background-color: rgba(22, 33, 62, 0.8);
+            padding: 15px;
+            border-radius: 10px;
+            display: inline-block;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px); /* Efecto vidrio borroso */
+        }
+        input {
+            padding: 10px;
+            font-size: 16px;
+            width: 80px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            text-align: center;
+        }
+        button {
+            padding: 10px 15px;
+            font-size: 16px;
+            margin-left: 10px;
+            cursor: pointer;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            color: white;
+            transition: transform 0.2s, background-color 0.2s;
+        }
+        button:hover { transform: scale(1.05); }
+        .btn-generar { background-color: #0f3460; }
+        .btn-generar:hover { background-color: #1a5296; }
+        .btn-reiniciar { background-color: #e94560; display: none; }
+        .btn-reiniciar:hover { background-color: #ff5773; }
+
+        /* --- CUADRÍCULA DE TARJETAS --- */
+        .cuadricula {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(90px, 1fr));
+            gap: 15px;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding-bottom: 50px;
+        }
+
+        .tarjeta-contenedor {
+            perspective: 1000px;
+            cursor: pointer;
+            height: 90px;
+        }
+
+        .tarjeta-inner {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            text-align: center;
+            transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1);
+            transform-style: preserve-3d;
+        }
+
+        .tarjeta-contenedor.volteada .tarjeta-inner {
+            transform: rotateY(180deg);
+        }
+
+        .tarjeta-front, .tarjeta-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            font-size: 35px;
+        }
+
+        .tarjeta-front {
+            background: linear-gradient(135deg, #f9a826, #ff4c29);
+            border: 2px solid #fff;
+        }
+
+        .tarjeta-back {
+            background-color: #fff;
+            color: #333;
+            transform: rotateY(180deg);
+            font-size: 28px;
+            font-weight: bold;
+            border: 3px solid #f9a826;
+        }
+
+        .tarjeta-contenedor.volteada {
+            cursor: default;
+            opacity: 0.6; /* Las cartas abiertas se oscurecen más para resaltar las nuevas */
+        }
+
+        /* --- ANIMACIÓN DE DESTELLO --- */
+        @keyframes destelloMagico {
+            0% { transform: scale(1); filter: brightness(1); box-shadow: 0 0 0px #fff; }
+            50% { transform: scale(1.2); filter: brightness(1.5); box-shadow: 0 0 30px #fff, 0 0 50px #f9a826; }
+            100% { transform: scale(1); filter: brightness(1); box-shadow: 0 0 0px #fff; }
+        }
+        .animacion-destello .tarjeta-inner {
+            animation: destelloMagico 0.5s ease-out;
+        }
+
+        /* --- NÚMERO GIGANTE --- */
+        .overlay-numero {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s;
+            cursor: pointer;
+        }
+        .overlay-numero.activo {
+            visibility: visible;
+            opacity: 1;
+        }
+        .numero-gigante {
+            font-size: 250px;
+            font-weight: bold;
+            color: #f9a826;
+            text-shadow: 0 0 50px #ff4c29, 0 0 100px #f9a826;
+            transform: scale(0.5);
+            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .overlay-numero.activo .numero-gigante {
+            transform: scale(1);
+        }
+        .texto-click {
+            position: absolute;
+            bottom: 50px;
+            font-size: 24px;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Contenedor donde aparecerán los emojis flotantes -->
+    <div class="fondo-animado" id="contenedor-kawaii"></div>
+
+    <h1>✨ Gran Rifa Sorpresa ✨</h1>
+    <p id="contador-estado">Números disponibles: 0</p>
+
+    <div class="controles" id="panel-controles">
+        <label for="cantidad">Generar números:</label>
+        <input type="number" id="cantidad" value="50" min="1" max="500">
+        <button class="btn-generar" onclick="iniciarNuevaRifa()">Crear Nuevo Tablero</button>
+    </div>
+    
+    <button class="btn-reiniciar" id="btn-reiniciar" onclick="borrarRifa()">⚠️ Terminar y Borrar Rifa Actual</button>
+
+    <div class="cuadricula" id="contenedor-tarjetas"></div>
+
+    <div class="overlay-numero" id="overlay" onclick="cerrarNumeroGigante()">
+        <div class="numero-gigante" id="numero-mostrado"></div>
+        <div class="texto-click">(Haz clic en cualquier lado para continuar)</div>
+    </div>
+
+    <script>
+        let estadoRifa = { activa: false, total: 0, numeros: [], descubiertos: [] };
+        const emojisTablero = ['🎁', '🍀', '💰', '🎉', '🧸', '🏆', '🍕', '🚀', '💎', '⭐', '🔥', '🎯'];
+        let contextoAudio;
+
+        window.onload = () => {
+            crearMagiaKawaii(); // Lanza los unicornios y estrellas al cargar
+            
+            const datosGuardados = localStorage.getItem('rifaGuardada');
+            if (datosGuardados) {
+                estadoRifa = JSON.parse(datosGuardados);
+                if (estadoRifa.activa) {
+                    restaurarTablero();
+                }
+            }
+        };
+
+        // --- SISTEMA DE FONDO KAWAII FLOTANTE ---
+        function crearMagiaKawaii() {
+            const contenedor = document.getElementById('contenedor-kawaii');
+            const elementosKawaii = ['🦄', '🌈', '🐻', '🌠', '✨', '🎀', '🍭', '💖', '🌸', '🐰', '🍰', '🎈'];
+            const cantidadElementos = 30; // Cantidad de figuritas en pantalla
+
+            for (let i = 0; i < cantidadElementos; i++) {
+                const el = document.createElement('div');
+                el.classList.add('elemento-flotante');
+                
+                // Emoji al azar
+                el.innerText = elementosKawaii[Math.floor(Math.random() * elementosKawaii.length)];
+                
+                // Tamaño al azar entre 25px y 55px
+                const tamano = Math.random() * 30 + 25;
+                el.style.fontSize = `${tamano}px`;
+                
+                // Posición horizontal al azar a lo largo de la pantalla
+                el.style.left = `${Math.random() * 100}vw`;
+                
+                // Duración de la animación (velocidad de subida)
+                const duracion = Math.random() * 15 + 10; 
+                el.style.animationDuration = `${duracion}s`;
+                
+                // Retraso para que no salgan todos juntos al mismo tiempo
+                const retraso = Math.random() * 20;
+                el.style.animationDelay = `-${retraso}s`;
+
+                contenedor.appendChild(el);
+            }
+        }
+
+        // --- SISTEMA DE SONIDO ---
+        function reproducirSonidoMagico() {
+            if (!contextoAudio) {
+                contextoAudio = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (contextoAudio.state === 'suspended') contextoAudio.resume();
+
+            const notas = [1046.50, 1318.51, 1567.98, 2093.00]; 
+            notas.forEach((frecuencia, i) => {
+                const oscilador = contextoAudio.createOscillator();
+                const ganancia = contextoAudio.createGain();
+                
+                oscilador.type = 'sine'; 
+                oscilador.frequency.value = frecuencia;
+                oscilador.connect(ganancia);
+                ganancia.connect(contextoAudio.destination);
+                
+                const tiempoInicio = contextoAudio.currentTime + (i * 0.08); 
+                ganancia.gain.setValueAtTime(0, tiempoInicio);
+                ganancia.gain.linearRampToValueAtTime(0.3, tiempoInicio + 0.02);
+                ganancia.gain.exponentialRampToValueAtTime(0.001, tiempoInicio + 0.6); 
+                
+                oscilador.start(tiempoInicio);
+                oscilador.stop(tiempoInicio + 0.6);
+            });
+        }
+
+        // --- LÓGICA DEL JUEGO ---
+        function iniciarNuevaRifa() {
+            const cantidad = parseInt(document.getElementById('cantidad').value);
+            if (cantidad < 1 || isNaN(cantidad)) return alert("Ingresa un número válido.");
+
+            let arrayNumeros = [];
+            for (let i = 1; i <= cantidad; i++) arrayNumeros.push(i);
+            
+            for (let i = arrayNumeros.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arrayNumeros[i], arrayNumeros[j]] = [arrayNumeros[j], arrayNumeros[i]];
+            }
+
+            estadoRifa = { activa: true, total: cantidad, numeros: arrayNumeros, descubiertos: [] };
+            guardarProgreso();
+            restaurarTablero();
+        }
+
+        function restaurarTablero() {
+            document.getElementById('panel-controles').style.display = 'none';
+            document.getElementById('btn-reiniciar').style.display = 'inline-block';
+            
+            const contenedor = document.getElementById('contenedor-tarjetas');
+            contenedor.innerHTML = ''; 
+
+            estadoRifa.numeros.forEach((numero, index) => {
+                const tarjeta = document.createElement('div');
+                tarjeta.classList.add('tarjeta-contenedor');
+                tarjeta.id = `tarjeta-${index}`;
+                
+                if (estadoRifa.descubiertos.includes(index)) {
+                    tarjeta.classList.add('volteada');
+                }
+
+                const emoji = emojisTablero[index % emojisTablero.length];
+
+                tarjeta.innerHTML = `
+                    <div class="tarjeta-inner">
+                        <div class="tarjeta-front" style="background-color: ${obtenerColorPastel(index)}">${emoji}</div>
+                        <div class="tarjeta-back">${numero}</div>
+                    </div>
+                `;
+
+                tarjeta.onclick = () => procesarClic(index, numero);
+                contenedor.appendChild(tarjeta);
+            });
+
+            actualizarContador();
+        }
+
+        function procesarClic(index, numero) {
+            if (estadoRifa.descubiertos.includes(index)) return;
+
+            reproducirSonidoMagico();
+            const tarjeta = document.getElementById(`tarjeta-${index}`);
+            tarjeta.classList.add('animacion-destello');
+
+            setTimeout(() => {
+                tarjeta.classList.add('volteada');
+                estadoRifa.descubiertos.push(index);
+                guardarProgreso();
+                actualizarContador();
+
+                setTimeout(() => {
+                    mostrarNumeroGigante(numero);
+                    tarjeta.classList.remove('animacion-destello');
+                }, 500);
+            }, 200); 
+        }
+
+        function mostrarNumeroGigante(numero) {
+            document.getElementById('numero-mostrado').innerText = numero;
+            document.getElementById('overlay').classList.add('activo');
+        }
+
+        function cerrarNumeroGigante() {
+            document.getElementById('overlay').classList.remove('activo');
+        }
+
+        function borrarRifa() {
+            if(confirm("¿Estás seguro de querer borrar esta rifa? Todos los números se perderán.")) {
+                localStorage.removeItem('rifaGuardada');
+                location.reload(); 
+            }
+        }
+
+        function guardarProgreso() {
+            localStorage.setItem('rifaGuardada', JSON.stringify(estadoRifa));
+        }
+
+        function actualizarContador() {
+            const disponibles = estadoRifa.total - estadoRifa.descubiertos.length;
+            document.getElementById('contador-estado').innerText = `Números disponibles: ${disponibles} de ${estadoRifa.total}`;
+        }
+
+        function obtenerColorPastel(index) {
+            const colores = ['#FFD1DC', '#FFDFBA', '#FFFFBA', '#BAFFC9', '#BAE1FF', '#E8BAFF'];
+            return colores[index % colores.length];
+        }
+    </script>
+</body>
+</html>
